@@ -1,0 +1,54 @@
+name: Build Flutter APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
+          
+      - name: Extract source
+        run: |
+          unzip -q source.zip -d extracted_source
+          cp -r extracted_source/* .
+          
+      - name: Get dependencies
+        run: flutter pub get
+          
+      - name: Build APK
+        run: flutter build apk --release --split-per-abi
+          
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-apks
+          path: build/app/outputs/flutter-apk/*.apk
+          
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: build_${{ github.run_number }}
+          release_name: Build ${{ github.run_number }}
+          draft: false
+          prerelease: false
+          
+      - name: Upload Release APK
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: build/app/outputs/flutter-apk/app-release.apk
+          asset_name: app-release.apk
+          asset_content_type: application/vnd.android.package-archive
